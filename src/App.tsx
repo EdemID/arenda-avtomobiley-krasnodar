@@ -11,7 +11,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { type Dispatch, type FormEvent, type KeyboardEvent, type SetStateAction, useEffect, useRef, useState } from 'react'
 import './App.css'
 import { contactConfig } from './config/contactConfig'
 import {
@@ -36,6 +36,8 @@ const formCarOptions = [
   'BMW X6 чёрный',
   'Помогите выбрать',
 ]
+
+const assetUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -149,18 +151,18 @@ function App() {
 
 interface HeaderProps {
   menuOpen: boolean
-  setMenuOpen: (value: boolean) => void
+  setMenuOpen: Dispatch<SetStateAction<boolean>>
 }
 
 function Header({ menuOpen, setMenuOpen }: HeaderProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (!menuOpen) return
 
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node
-      if (panelRef.current && !panelRef.current.contains(target)) {
+      if (headerRef.current && !headerRef.current.contains(target)) {
         setMenuOpen(false)
       }
     }
@@ -172,8 +174,18 @@ function Header({ menuOpen, setMenuOpen }: HeaderProps) {
   const closeMenu = () => setMenuOpen(false)
 
   return (
-    <header className="site-header">
+    <header className="site-header" ref={headerRef}>
       <div className="container header-inner">
+        <button
+          className="menu-toggle"
+          type="button"
+          aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
+          aria-expanded={menuOpen}
+          aria-controls="mobile-menu"
+          onClick={() => setMenuOpen((isOpen) => !isOpen)}
+        >
+          {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+        </button>
         <a className="logo" href="#top" aria-label="Аренда автомобилей Краснодар">
           <span>Аренда автомобилей</span>
           <strong>Краснодар</strong>
@@ -189,19 +201,8 @@ function Header({ menuOpen, setMenuOpen }: HeaderProps) {
           <CalendarCheck aria-hidden="true" size={18} />
           Узнать доступность
         </a>
-        <button
-          className="menu-toggle"
-          type="button"
-          aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
-          aria-expanded={menuOpen}
-          aria-controls="mobile-menu"
-          onClick={() => setMenuOpen(!menuOpen)}
-        >
-          {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-        </button>
       </div>
       <div
-        ref={panelRef}
         id="mobile-menu"
         className={`mobile-menu ${menuOpen ? 'is-open' : ''}`}
         aria-hidden={!menuOpen}
@@ -255,8 +256,8 @@ function Hero() {
         </div>
         <figure className="hero-media">
           <img
-            src="/images/cars/black-x6-hero.jpg"
-            srcSet="/images/cars/black-x6-hero.jpg 1320w"
+            src={assetUrl('/images/cars/black-x6-hero.jpg')}
+            srcSet={`${assetUrl('/images/cars/black-x6-hero.jpg')} 1320w`}
             sizes="(max-width: 860px) 100vw, 52vw"
             width="1320"
             height="889"
@@ -282,7 +283,7 @@ function Fleet() {
           <article className="car-card" key={car.id}>
             {car.image ? (
               <img
-                src={car.image.src}
+                src={assetUrl(car.image.src)}
                 width={car.image.width}
                 height={car.image.height}
                 alt={car.image.alt}
@@ -339,7 +340,7 @@ function X6Section({ onOpenPhoto }: { onOpenPhoto: (index: number, opener: HTMLE
         <div className="x6-media">
           <button type="button" className="main-photo-button" onClick={(event) => onOpenPhoto(0, event.currentTarget)}>
             <img
-              src={x6Gallery[0].src}
+              src={assetUrl(x6Gallery[0].src)}
               width={x6Gallery[0].width}
               height={x6Gallery[0].height}
               alt={x6Gallery[0].alt}
@@ -350,7 +351,7 @@ function X6Section({ onOpenPhoto }: { onOpenPhoto: (index: number, opener: HTMLE
           <div className="thumb-grid" aria-label="Галерея BMW X6">
             {x6Gallery.map((image, index) => (
               <button key={image.src} type="button" onClick={(event) => onOpenPhoto(index, event.currentTarget)}>
-                <img src={image.src} width={image.width} height={image.height} alt={image.alt} loading="lazy" />
+                <img src={assetUrl(image.src)} width={image.width} height={image.height} alt={image.alt} loading="lazy" />
               </button>
             ))}
           </div>
@@ -461,8 +462,10 @@ function RentalProcess() {
       <div className="container steps-grid">
         {rentalSteps.map(([title, text], index) => (
           <article className="step-card" key={title}>
-            <span>{String(index + 1).padStart(2, '0')}</span>
-            <h3>{title}</h3>
+            <div className="step-heading">
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <h3>{title}</h3>
+            </div>
             <p>{text}</p>
           </article>
         ))}
@@ -885,7 +888,7 @@ function ImageLightbox({
         <button ref={closeRef} className="icon-button modal-close" type="button" onClick={onClose} aria-label="Закрыть фото">
           <X aria-hidden="true" />
         </button>
-        <img src={image.src} width={image.width} height={image.height} alt={image.alt} />
+        <img src={assetUrl(image.src)} width={image.width} height={image.height} alt={image.alt} />
         <div className="lightbox-controls">
           <button className="button button-secondary" type="button" onClick={onPrev}>
             Предыдущее

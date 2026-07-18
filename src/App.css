@@ -187,21 +187,29 @@
   display: none;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .hero-section {
   padding-top: 36px;
 }
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 34px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+  gap: 48px;
   align-items: center;
 }
 
+.hero-copy {
+  min-width: 0;
+}
+
 .hero-copy h1 {
-  max-width: 720px;
+  max-width: 660px;
   margin-bottom: 18px;
-  font-size: clamp(2.45rem, 6vw, 5.8rem);
+  font-size: clamp(2.45rem, 5vw, 4.8rem);
 }
 
 .hero-text {
@@ -559,15 +567,33 @@
 }
 
 .step-card {
+  display: grid;
+  gap: 14px;
   padding: 22px;
 }
 
-.step-card span {
+.step-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.step-heading span {
+  width: 42px;
+  height: 42px;
   display: inline-flex;
-  margin-bottom: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #efe4d3;
   color: var(--accent-dark);
   font-size: 0.9rem;
   font-weight: 900;
+}
+
+.step-heading h3 {
+  margin: 3px 0 0;
 }
 
 .availability-section {
@@ -934,6 +960,7 @@
 
   .menu-toggle {
     display: inline-flex;
+    order: -1;
   }
 
   .mobile-menu {
@@ -1026,6 +1053,10 @@
     gap: 10px;
   }
 
+  .logo {
+    min-width: 0;
+  }
+
   .logo span {
     font-size: 0.65rem;
   }
@@ -1036,6 +1067,10 @@
 
   .header-cta {
     display: none;
+  }
+
+  .menu-toggle {
+    margin-right: 2px;
   }
 
   .hero-section {
@@ -1050,10 +1085,13 @@
   .car-grid,
   .benefits-grid,
   .services-grid,
-  .steps-grid,
   .form-row,
   .spec-grid,
   .footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .steps-grid {
     grid-template-columns: 1fr;
   }
 
