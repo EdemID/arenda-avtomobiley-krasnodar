@@ -1,4 +1,4 @@
-export type PreferredContact = 'phone' | 'telegram' | 'whatsapp'
+export type PreferredContact = 'sms' | 'telegram' | 'whatsapp'
 
 export interface LeadFormData {
   car: string
