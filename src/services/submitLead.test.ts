@@ -41,7 +41,7 @@ describe('lead submission', () => {
     const lead = makeLead('telegram')
     const url = new URL(buildLeadSubmissionUrl(lead))
 
-    expect(`${url.origin}${url.pathname}`).toBe('https://t.me/rentcar_krasnodar')
+    expect(`${url.origin}${url.pathname}`).toBe('https://t.me/+79776341920')
     expect(url.searchParams.get('text')).toBe(buildLeadMessage(lead))
   })
 
