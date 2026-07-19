@@ -1,126 +1,64 @@
-# Аренда автомобилей Краснодар
+# Аренда автомобилей в Краснодаре
 
-Одностраничный лендинг премиальной аренды BMW в Краснодаре. Проект создан на React, TypeScript и Vite, без роутинга и тяжёлых UI-библиотек. Основные разделы находятся на одной странице и открываются через якорную навигацию.
+Одностраничный сайт аренды премиальных автомобилей. Каталог остаётся компактным: подробная информация и галерея каждой машины открываются в модальном окне.
 
-## Стек
+## Автомобили
 
-- React
-- TypeScript
-- Vite
-- Обычный CSS
-- lucide-react для лёгких иконок
+- BMW X6 xDrive30D — 4 фотографии;
+- BMW 4 серии Gran Coupe — 5 фотографий;
+- BMW 7 серии 740d — 16 фотографий;
+- BMW X6 M50d Frozen Night Sky Metallic — 14 фотографий.
 
-## Запуск
+Все изображения лежат в `public/images/cars`. Данные, описания и порядок фотографий настраиваются в `src/data/content.ts`.
+
+## Форма заявки
+
+Проект публикуется как статический сайт, поэтому форма работает без отдельного сервера:
+
+1. проверяет автомобиль, даты, имя, телефон и согласие;
+2. формирует структурированное сообщение;
+3. предлагает отправить заявку через WhatsApp, Telegram или обычное SMS на номер менеджера `+7 977 634-19-20`;
+4. пользователь проверяет готовый текст и нажимает «Отправить».
+
+Генерация сообщения находится в `src/services/submitLead.ts`, контакты — в `src/config/contactConfig.ts`.
+
+Если в будущем потребуется полностью автоматическая отправка без открытия выбранного приложения, понадобится backend или serverless-функция. Она должна принимать заявку, проверять данные на сервере, защищаться от спама и пересылать обращение в CRM, Telegram Bot API или почту.
+
+## Разработка
+
+Требуется Node.js 22 или новее.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Production-сборка:
+Полная проверка:
 
 ```bash
+npm run test
+npm run lint
 npm run build
 ```
 
-Линтер:
-
-```bash
-npm run lint
-```
-
-## Фотографии автомобилей
-
-Исходные фотографии искались в `~/Downloads/Telegram Desktop/`. Найдены только папки с BMW X6:
-
-- `BMW X6 m performance/photo_1_2026-07-18_17-43-14.jpg` — использовано как `public/images/cars/blue-x6-front.jpg`;
-- `X6 xDrive30D/photo_1_2026-07-18_17-42-09.jpg` — использовано как `public/images/cars/black-x6-hero.jpg` и `public/images/meta/og-image.jpg`;
-- `X6 xDrive30D/photo_2_2026-07-18_17-42-09.jpg` — использовано как `public/images/cars/black-x6-detail.jpg`;
-- `X6 xDrive30D/photo_3_2026-07-18_17-42-10.jpg` — использовано как `public/images/cars/black-x6-interior.jpg`;
-- `X6 xDrive30D/photo_4_2026-07-18_17-42-10.jpg` — использовано как `public/images/cars/black-x6-gallery.jpg`.
-
-Фото BMW 7 и BMW 4 Gran Coupe в указанной папке не найдены. В карточках оставлены честные заглушки с пометкой, чтобы не назначать моделям случайные изображения.
-
-## Где менять данные
-
-- Список автомобилей: `src/data/content.ts`
-- Характеристики чёрного BMW X6: `src/data/content.ts`, массив `x6Specs`
-- Преимущества, услуги, шаги аренды и FAQ: `src/data/content.ts`
-- Контактные данные: `src/config/contactConfig.ts`
-- SEO, домен и canonical URL: `src/config/seoConfig.ts`, а также `index.html`, `public/robots.txt`, `public/sitemap.xml`
-- Отправка заявки: `src/services/submitLead.ts`
-
-## Форма заявки
-
-Реальная отправка не подключена. Сейчас `submitLead` в демонстрационном режиме возвращает сообщение:
-
-> Форма заполнена корректно. Для реальной отправки необходимо подключить API.
-
-Перед публикацией подключите реальный endpoint в `src/services/submitLead.ts` и не выводите персональные данные в консоль.
-
-## SEO и медиа
-
-- Favicon: `public/favicon.svg`
-- Open Graph image: `public/images/meta/og-image.jpg`
-- Robots: `public/robots.txt`
-- Sitemap: `public/sitemap.xml`
-
-Сейчас проект настроен под GitHub Pages URL:
-
-```text
-https://edemid.github.io/arenda-avtomobiley-krasnodar/
-```
-
-Если будет выбран другой домен или другое имя репозитория, обновите `vite.config.ts`, `src/config/seoConfig.ts`, `index.html`, `public/robots.txt` и `public/sitemap.xml`.
-
 ## Публикация
 
-### GitHub Pages
+Workflow `.github/workflows/deploy-pages.yml` собирает и публикует сайт в GitHub Pages после push в `main`.
 
-Проект подготовлен под репозиторий `EdemID/arenda-avtomobiley-krasnodar`.
-
-1. Создайте репозиторий `arenda-avtomobiley-krasnodar` в аккаунте `EdemID`.
-2. Запушьте код в ветку `main`.
-3. В настройках репозитория откройте `Settings -> Pages`.
-4. В `Build and deployment` выберите `Source: GitHub Actions`.
-5. Workflow `.github/workflows/deploy-pages.yml` соберёт проект и опубликует сайт.
-
-Ожидаемая ссылка после деплоя:
+Ожидаемый адрес:
 
 ```text
 https://edemid.github.io/arenda-avtomobiley-krasnodar/
 ```
 
-### Vercel
+Для Vercel или Netlify используются стандартные настройки Vite:
 
-1. Импортируйте репозиторий в Vercel.
-2. Framework Preset: Vite.
-3. Build Command: `npm run build`.
-4. Output Directory: `dist`.
+- build command: `npm run build`;
+- output directory: `dist`.
 
-### Netlify
+## Что важно заполнить перед коммерческим запуском
 
-1. Импортируйте репозиторий в Netlify.
-2. Build command: `npm run build`.
-3. Publish directory: `dist`.
-
-### Обычный сервер
-
-1. Выполните `npm run build`.
-2. Загрузите содержимое папки `dist` на сервер.
-3. Настройте отдачу `index.html` и статических файлов.
-
-## TODO перед публикацией
-
-- указать реальный номер телефона;
-- указать ссылки Telegram и WhatsApp;
-- заменить GitHub Pages URL, если будет выбран другой домен или другое имя репозитория;
-- заполнить данные владельца сайта;
-- заменить юридический текст политики конфиденциальности;
-- уточнить реальные условия аренды;
-- добавить требования к водителю;
-- добавить размер залога;
-- добавить стоимость аренды;
-- подключить API отправки заявок;
-- добавить реальные фото BMW 7 и BMW 4 Gran Coupe;
-- проверить финальный юридический текст перед запуском.
+- финальные цены, залог и требования к водителю;
+- юридические реквизиты владельца сайта;
+- проверенную юристом политику конфиденциальности и согласие на обработку данных;
+- собственный домен и соответствующие значения в SEO-конфигурации.
