@@ -1,17 +1,33 @@
 import {
   CalendarCheck,
+  CalendarDays,
   CarFront,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleArrowUp,
+  Clock3,
   MapPin,
   Menu,
   MessageCircle,
+  MessageSquareText,
+  Phone,
+  Send,
   ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react'
-import { type Dispatch, type FormEvent, type KeyboardEvent, type SetStateAction, useEffect, useRef, useState } from 'react'
+import {
+  type Dispatch,
+  type FormEvent,
+  type KeyboardEvent,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import './App.css'
 import { contactConfig } from './config/contactConfig'
 import {
@@ -22,31 +38,23 @@ import {
   initialLeadFormData,
   navItems,
   rentalSteps,
-  serviceGroups,
-  x6Gallery,
-  x6Specs,
+  type CarItem,
 } from './data/content'
-import { submitLead } from './services/submitLead'
-import type { LeadFormData, LeadFormErrors } from './types/lead'
+import { buildLeadMessage, buildLeadSubmissionUrl, submissionChannels } from './services/submitLead'
+import type { LeadFormData, LeadFormErrors, PreferredContact } from './types/lead'
 
-const formCarOptions = [
-  'BMW 7',
-  'BMW 4 Gran Coupe',
-  'BMW X6 синий',
-  'BMW X6 чёрный',
-  'Помогите выбрать',
-]
-
+const formCarOptions = [...cars.map((car) => car.shortName), 'Помогите выбрать']
 const assetUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [activePhoto, setActivePhoto] = useState<number | null>(null)
+  const [selectedCar, setSelectedCar] = useState<CarItem | null>(null)
+  const [requestedCar, setRequestedCar] = useState(initialLeadFormData.car)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
 
-  const lockScroll = menuOpen || activePhoto !== null || privacyOpen || consentOpen
+  const lockScroll = menuOpen || selectedCar !== null || privacyOpen || consentOpen
 
   useEffect(() => {
     document.body.classList.toggle('scroll-locked', lockScroll)
@@ -57,7 +65,7 @@ function App() {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape') return
       setMenuOpen(false)
-      setActivePhoto(null)
+      setSelectedCar(null)
       setPrivacyOpen(false)
       setConsentOpen(false)
     }
@@ -67,21 +75,27 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (activePhoto === null && !privacyOpen && !consentOpen && returnFocus) {
+    if (!selectedCar && !privacyOpen && !consentOpen && returnFocus) {
       returnFocus.focus()
       setReturnFocus(null)
     }
-  }, [activePhoto, consentOpen, privacyOpen, returnFocus])
+  }, [consentOpen, privacyOpen, returnFocus, selectedCar])
 
-  const openPhoto = (index: number, opener: HTMLElement) => {
+  const openCar = (car: CarItem, opener: HTMLElement) => {
     setReturnFocus(opener)
-    setActivePhoto(index)
+    setSelectedCar(car)
   }
 
   const openInfoModal = (modal: 'privacy' | 'consent', opener: HTMLElement) => {
     setReturnFocus(opener)
     if (modal === 'privacy') setPrivacyOpen(true)
     if (modal === 'consent') setConsentOpen(true)
+  }
+
+  const chooseCar = (car: CarItem) => {
+    setRequestedCar(car.shortName)
+    setSelectedCar(null)
+    window.setTimeout(() => document.querySelector('#availability')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
   return (
@@ -92,13 +106,10 @@ function App() {
       <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <main id="main">
         <Hero />
-        <Fleet />
-        <X6Section onOpenPhoto={openPhoto} />
-        <ServiceDescription />
+        <Fleet onOpenCar={openCar} />
         <Benefits />
-        <Services />
         <RentalProcess />
-        <AvailabilityForm onOpenLegal={openInfoModal} />
+        <AvailabilityForm preferredCar={requestedCar} onOpenLegal={openInfoModal} />
         <FAQ />
         <Contacts />
         <FinalCTA />
@@ -107,41 +118,36 @@ function App() {
       <BottomActions />
       <BackToTopButton />
 
-      {activePhoto !== null ? (
-        <ImageLightbox
-          image={x6Gallery[activePhoto]}
-          onClose={() => setActivePhoto(null)}
-          onPrev={() => setActivePhoto((activePhoto + x6Gallery.length - 1) % x6Gallery.length)}
-          onNext={() => setActivePhoto((activePhoto + 1) % x6Gallery.length)}
-        />
+      {selectedCar ? (
+        <CarModal car={selectedCar} onClose={() => setSelectedCar(null)} onChoose={() => chooseCar(selectedCar)} />
       ) : null}
 
       {privacyOpen ? (
         <LegalModal title="Политика конфиденциальности" onClose={() => setPrivacyOpen(false)}>
           <p>
-            Этот технический текст подготовлен как базовый шаблон для лендинга. Перед публикацией его
-            необходимо заменить юридически проверенной политикой конфиденциальности.
+            Данные из формы используются только для ответа на запрос об аренде автомобиля. Мы не
+            публикуем и не передаём их сторонним организациям для рекламных рассылок.
           </p>
           <p>
-            TODO: указать владельца сайта, оператора персональных данных, способы обработки, сроки
-            хранения, порядок отзыва согласия и актуальные контактные данные.
+            Заявка отправляется через WhatsApp. Обработка сообщения также регулируется условиями и
+            политикой конфиденциальности этого сервиса.
           </p>
           <p>
-            Форма на сайте не подключена к реальному API и в демонстрационном режиме не передаёт заявку
-            менеджеру.
+            Уточнить порядок обработки или попросить удалить обращение можно по телефону{' '}
+            <a href={contactConfig.phoneHref}>{contactConfig.phone}</a> или в Telegram.
           </p>
         </LegalModal>
       ) : null}
 
       {consentOpen ? (
-        <LegalModal title="Согласие на обработку персональных данных" onClose={() => setConsentOpen(false)}>
+        <LegalModal title="Согласие на обработку данных" onClose={() => setConsentOpen(false)}>
           <p>
-            Нажимая кнопку проверки доступности, пользователь подтверждает согласие на обработку данных,
-            указанных в форме, исключительно для связи по вопросу аренды автомобиля.
+            Отправляя форму, пользователь разрешает использовать указанные имя, телефон, даты и
+            комментарий для связи по вопросу аренды выбранного автомобиля.
           </p>
           <p>
-            TODO: перед публикацией заполнить данные владельца сайта, правовое основание обработки и
-            финальную редакцию согласия.
+            Согласие действует до завершения обработки обращения и может быть отозвано сообщением в
+            Telegram или WhatsApp.
           </p>
         </LegalModal>
       ) : null}
@@ -161,17 +167,12 @@ function Header({ menuOpen, setMenuOpen }: HeaderProps) {
     if (!menuOpen) return
 
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (headerRef.current && !headerRef.current.contains(target)) {
-        setMenuOpen(false)
-      }
+      if (headerRef.current && !headerRef.current.contains(event.target as Node)) setMenuOpen(false)
     }
 
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [menuOpen, setMenuOpen])
-
-  const closeMenu = () => setMenuOpen(false)
 
   return (
     <header className="site-header" ref={headerRef}>
@@ -182,7 +183,7 @@ function Header({ menuOpen, setMenuOpen }: HeaderProps) {
           aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
           aria-expanded={menuOpen}
           aria-controls="mobile-menu"
-          onClick={() => setMenuOpen((isOpen) => !isOpen)}
+          onClick={() => setMenuOpen((open) => !open)}
         >
           {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
         </button>
@@ -199,23 +200,19 @@ function Header({ menuOpen, setMenuOpen }: HeaderProps) {
         </nav>
         <a className="button button-primary header-cta" href="#availability">
           <CalendarCheck aria-hidden="true" size={18} />
-          Узнать доступность
+          Проверить даты
         </a>
       </div>
-      <div
-        id="mobile-menu"
-        className={`mobile-menu ${menuOpen ? 'is-open' : ''}`}
-        aria-hidden={!menuOpen}
-      >
+      <div id="mobile-menu" className={`mobile-menu ${menuOpen ? 'is-open' : ''}`} aria-hidden={!menuOpen}>
         <nav aria-label="Мобильная навигация">
           {navItems.map((item) => (
-            <a key={item.href} href={item.href} onClick={closeMenu}>
+            <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)}>
               {item.label}
             </a>
           ))}
-          <a className="button button-primary" href="#availability" onClick={closeMenu}>
+          <a className="button button-primary" href="#availability" onClick={() => setMenuOpen(false)}>
             <CalendarCheck aria-hidden="true" size={18} />
-            Узнать доступность
+            Проверить даты
           </a>
         </nav>
       </div>
@@ -231,84 +228,83 @@ function Hero() {
           <p className="eyebrow">Премиальная аренда BMW в Краснодаре</p>
           <h1>Аренда премиальных автомобилей в Краснодаре</h1>
           <p className="hero-text">
-            BMW 7, BMW 4 Gran Coupe и BMW X6 с подачей к дому, отелю или в аэропорт.
-            Чистые и обслуженные автомобили с полным баком. Оформление занимает около 5 минут.
+            Выберите одну из четырёх актуальных моделей, посмотрите все фотографии и отправьте даты
+            менеджеру прямо из формы.
           </p>
-          <ul className="hero-benefits" aria-label="Короткие преимущества">
+          <ul className="hero-benefits" aria-label="Ключевые преимущества">
             {heroBenefits.map((item) => (
               <li key={item}>
                 <Check aria-hidden="true" size={18} />
-                {item}
+                <span>{item}</span>
               </li>
             ))}
           </ul>
-          <p className="price-note">Стоимость зависит от автомобиля, срока аренды и выбранных условий.</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="#availability">
-              <CalendarCheck aria-hidden="true" size={18} />
-              Проверить свободные даты
+            <a className="button button-primary" href="#cars">
+              <CarFront aria-hidden="true" size={19} />
+              Выбрать автомобиль
             </a>
-            <a className="button button-secondary" href="#cars">
-              <CarFront aria-hidden="true" size={18} />
-              Посмотреть автомобили
+            <a className="button button-secondary" href={contactConfig.telegramUrl} target="_blank" rel="noreferrer">
+              <Send aria-hidden="true" size={18} />
+              Написать в Telegram
             </a>
           </div>
         </div>
         <figure className="hero-media">
           <img
             src={assetUrl('/images/cars/black-x6-hero.jpg')}
-            srcSet={`${assetUrl('/images/cars/black-x6-hero.jpg')} 1320w`}
-            sizes="(max-width: 860px) 100vw, 52vw"
             width="1320"
             height="889"
-            alt="Чёрный BMW X6 xDrive30D на улице"
+            alt="Чёрный BMW X6 xDrive30D"
             fetchPriority="high"
           />
-          <figcaption>BMW X6 xDrive30D. Видео автомобиля предоставим по запросу.</figcaption>
+          <figcaption>
+            <Sparkles aria-hidden="true" size={17} />
+            <span>Четыре актуальных BMW — фотографии каждой машины внутри карточки</span>
+          </figcaption>
         </figure>
       </div>
     </section>
   )
 }
 
-function Fleet() {
+function Fleet({ onOpenCar }: { onOpenCar: (car: CarItem, opener: HTMLElement) => void }) {
   return (
-    <section id="cars" className="section">
-      <div className="container section-heading">
-        <p className="eyebrow">Автопарк</p>
-        <h2>Премиальные автомобили в аренду</h2>
+    <section id="cars" className="section fleet-section">
+      <div className="container section-heading heading-row">
+        <div>
+          <p className="eyebrow">Автопарк</p>
+          <h2>Выберите автомобиль</h2>
+        </div>
+        <p>Нажмите на карточку, чтобы открыть фотографии и подробное описание.</p>
       </div>
       <div className="container car-grid">
         {cars.map((car) => (
           <article className="car-card" key={car.id}>
-            {car.image ? (
-              <img
-                src={assetUrl(car.image.src)}
-                width={car.image.width}
-                height={car.image.height}
-                alt={car.image.alt}
-                loading={car.id === 'bmw-x6-black' ? 'eager' : 'lazy'}
-              />
-            ) : (
-              <div className="car-photo-placeholder" role="img" aria-label={car.photoNote}>
-                <CarFront aria-hidden="true" size={34} />
-                <span>{car.photoNote}</span>
-              </div>
-            )}
-            <div className="car-card-body">
-              <div>
-                <p className="tag">{car.className}</p>
-                <h3>{car.model}</h3>
-                <p>{car.description}</p>
-              </div>
-              <div className="card-meta">
-                <span>{car.priceLabel}</span>
-                <span>{car.videoLabel}</span>
-              </div>
-              <a className="button button-secondary" href="#availability">
-                Узнать доступность
-              </a>
-            </div>
+            <button type="button" className="car-card-button" onClick={(event) => onOpenCar(car, event.currentTarget)}>
+              <span className="car-card-media">
+                <img
+                  src={assetUrl(car.gallery[0].src)}
+                  width={car.gallery[0].width}
+                  height={car.gallery[0].height}
+                  alt={car.gallery[0].alt}
+                  loading={car.id === 'bmw-x6-black' ? 'eager' : 'lazy'}
+                />
+                <span className="photo-count">
+                  <Sparkles aria-hidden="true" size={15} />
+                  {car.gallery.length} фото
+                </span>
+              </span>
+              <span className="car-card-body">
+                <span className="tag">{car.className}</span>
+                <strong>{car.model}</strong>
+                <span className="car-summary">{car.summary}</span>
+                <span className="card-open-label">
+                  Подробнее
+                  <ChevronRight aria-hidden="true" size={18} />
+                </span>
+              </span>
+            </button>
           </article>
         ))}
       </div>
@@ -316,137 +312,156 @@ function Fleet() {
   )
 }
 
-function X6Section({ onOpenPhoto }: { onOpenPhoto: (index: number, opener: HTMLElement) => void }) {
-  const [specsOpen, setSpecsOpen] = useState(false)
+function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => void; onChoose: () => void }) {
+  const [activePhoto, setActivePhoto] = useState(0)
+  const [infoOpen, setInfoOpen] = useState(false)
+  const titleId = `${car.id}-modal-title`
+  const infoRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') setActivePhoto((current) => (current + car.gallery.length - 1) % car.gallery.length)
+      if (event.key === 'ArrowRight') setActivePhoto((current) => (current + 1) % car.gallery.length)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [car.gallery.length])
+
+  const collapseInfo = () => {
+    setInfoOpen(false)
+    infoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 
   return (
-    <section id="bmw-x6" className="section x6-section">
-      <div className="container x6-layout">
-        <div>
-          <p className="eyebrow">Акцентная модель</p>
-          <h2>Аренда BMW X6 в Краснодаре</h2>
-          <p>
-            Чёрный BMW X6 xDrive30D сочетает премиальный комфорт, уверенную посадку и спокойный
-            деловой характер. Машина передаётся чистой и полностью заправленной.
-          </p>
-          <div className="x6-actions">
-            <a className="button button-primary" href="#availability">
+    <div className="modal-backdrop car-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="car-modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <button type="button" className="icon-button modal-close" aria-label="Закрыть карточку автомобиля" onClick={onClose}>
+          <X aria-hidden="true" />
+        </button>
+        <div className="car-modal-grid">
+          <div className="car-gallery">
+            <div className="car-main-photo">
+              <img
+                src={assetUrl(car.gallery[activePhoto].src)}
+                width={car.gallery[activePhoto].width}
+                height={car.gallery[activePhoto].height}
+                alt={car.gallery[activePhoto].alt}
+              />
+              {car.gallery.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    className="gallery-arrow gallery-prev"
+                    aria-label="Предыдущее фото"
+                    onClick={() => setActivePhoto((activePhoto + car.gallery.length - 1) % car.gallery.length)}
+                  >
+                    <ChevronLeft aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="gallery-arrow gallery-next"
+                    aria-label="Следующее фото"
+                    onClick={() => setActivePhoto((activePhoto + 1) % car.gallery.length)}
+                  >
+                    <ChevronRight aria-hidden="true" />
+                  </button>
+                </>
+              ) : null}
+              <span className="gallery-counter">{activePhoto + 1} / {car.gallery.length}</span>
+            </div>
+            <div className="car-thumbnails" aria-label={`Галерея ${car.model}`}>
+              {car.gallery.map((image, index) => (
+                <button
+                  type="button"
+                  key={image.src}
+                  aria-label={`Открыть фото ${index + 1}`}
+                  aria-current={index === activePhoto ? 'true' : undefined}
+                  onClick={() => setActivePhoto(index)}
+                >
+                  <img src={assetUrl(image.src)} width={image.width} height={image.height} alt="" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="car-modal-copy">
+            <p className="tag">{car.className}</p>
+            <h2 id={titleId}>{car.model}</h2>
+            <p className="car-modal-intro">{car.intro}</p>
+            <ul className="modal-service-notes">
+              <li><MapPin aria-hidden="true" size={18} /><span>Подача по Краснодару и в аэропорт</span></li>
+              <li><Clock3 aria-hidden="true" size={18} /><span>Поддержка во время аренды 24/7</span></li>
+              <li><ShieldCheck aria-hidden="true" size={18} /><span>Прозрачные условия по договору</span></li>
+            </ul>
+            <button type="button" className="button button-primary car-book-button" onClick={onChoose}>
               <CalendarCheck aria-hidden="true" size={18} />
-              Проверить даты
-            </a>
-            <span>Видео автомобиля предоставим по запросу</span>
+              Выбрать эту машину
+            </button>
           </div>
         </div>
-        <div className="x6-media">
-          <button type="button" className="main-photo-button" onClick={(event) => onOpenPhoto(0, event.currentTarget)}>
-            <img
-              src={assetUrl(x6Gallery[0].src)}
-              width={x6Gallery[0].width}
-              height={x6Gallery[0].height}
-              alt={x6Gallery[0].alt}
-              loading="lazy"
-            />
-            <span>Открыть фото</span>
-          </button>
-          <div className="thumb-grid" aria-label="Галерея BMW X6">
-            {x6Gallery.map((image, index) => (
-              <button key={image.src} type="button" onClick={(event) => onOpenPhoto(index, event.currentTarget)}>
-                <img src={assetUrl(image.src)} width={image.width} height={image.height} alt={image.alt} loading="lazy" />
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="specs-panel">
+        <div className="car-info" ref={infoRef}>
           <button
             type="button"
-            className="specs-toggle"
-            aria-expanded={specsOpen}
-            aria-controls="x6-specs"
-            onClick={() => setSpecsOpen((isOpen) => !isOpen)}
+            className="info-toggle"
+            aria-expanded={infoOpen}
+            aria-controls={`${car.id}-info`}
+            onClick={() => setInfoOpen((open) => !open)}
           >
-            <span>{specsOpen ? 'Скрыть информацию о машине' : 'Показать информацию о машине'}</span>
+            <span>{infoOpen ? 'Скрыть информацию о машине' : 'Показать информацию о машине'}</span>
             <ChevronDown aria-hidden="true" />
           </button>
-          <dl id="x6-specs" className="spec-grid" hidden={!specsOpen}>
-            {x6Specs.map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function ServiceDescription() {
-  return (
-    <section className="section service-description">
-      <div className="container narrow">
-        <p>
-          BMW 7, BMW 4 Gran Coupe, синий BMW X6 и лаконичный чёрный BMW X6 — с подачей к дому,
-          отелю или в аэропорт. Автомобили регулярно обслуживаются и перед каждой арендой проходят
-          мойку. Машина передаётся чистой и с полным баком. Оформление занимает около 5 минут: без
-          длинных звонков и ненужной бюрократии.
-        </p>
-        <div className="callout">
-          <MessageCircle aria-hidden="true" />
-          <div>
-            <h2>Напишите нам — проверим даты</h2>
-            <p>
-              Расскажем об условиях и предварительно зарезервируем автомобиль. Также можно оставить
-              номер телефона: мы перезвоним без переключений между менеджерами.
-            </p>
-            <span>Видео выбранного автомобиля предоставим по запросу.</span>
+          <div id={`${car.id}-info`} className="car-info-content" hidden={!infoOpen}>
+            <p className="car-info-lead">{car.intro}</p>
+            <div className="car-info-blocks">
+              {car.info.map((item) => (
+                <article key={item.title}>
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                </article>
+              ))}
+            </div>
+            <button type="button" className="button button-secondary collapse-info-button" onClick={collapseInfo}>
+              <ChevronDown aria-hidden="true" size={18} />
+              Свернуть информацию
+            </button>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   )
 }
 
 function Benefits() {
+  const icons = [
+    MapPin,
+    MapPin,
+    Clock3,
+    ShieldCheck,
+    CalendarDays,
+    Sparkles,
+    CarFront,
+    MapPin,
+    Check,
+    Send,
+    Clock3,
+    Sparkles,
+  ]
+
   return (
-    <section id="benefits" className="section">
+    <section id="benefits" className="section benefits-section">
       <div className="container section-heading">
-        <p className="eyebrow">Преимущества</p>
-        <h2>Почему выбирают нашу аренду автомобилей</h2>
+        <p className="eyebrow">Сервис</p>
+        <h2>Всё необходимое для спокойной аренды</h2>
       </div>
       <div className="container benefits-grid">
-        {benefits.map((item, index) => (
-          <article key={item} className="benefit-card">
-            {index % 3 === 0 ? <ShieldCheck aria-hidden="true" /> : index % 3 === 1 ? <MapPin aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
-            <p>{item}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function Services() {
-  return (
-    <section id="services" className="section muted-section">
-      <div className="container section-heading">
-        <p className="eyebrow">Услуги</p>
-        <h2>Услуги аренды автомобилей</h2>
-      </div>
-      <div className="container services-grid">
-        {serviceGroups.map((group) => (
-          <article className="service-group" key={group.title}>
-            <h3>{group.title}</h3>
-            <ul>
-              {group.items.map((item) => (
-                <li key={item}>
-                  <Check aria-hidden="true" size={17} />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </article>
-        ))}
+        {benefits.map((item, index) => {
+          const Icon = icons[index]
+          return (
+            <article key={item} className="benefit-card">
+              <span className="feature-icon"><Icon aria-hidden="true" size={21} /></span>
+              <p>{item}</p>
+            </article>
+          )
+        })}
       </div>
     </section>
   )
@@ -454,9 +469,9 @@ function Services() {
 
 function RentalProcess() {
   return (
-    <section id="terms" className="section">
+    <section id="terms" className="section process-section">
       <div className="container section-heading">
-        <p className="eyebrow">Условия</p>
+        <p className="eyebrow">Четыре шага</p>
         <h2>Как проходит аренда</h2>
       </div>
       <div className="container steps-grid">
@@ -475,207 +490,188 @@ function RentalProcess() {
 }
 
 function AvailabilityForm({
+  preferredCar,
   onOpenLegal,
 }: {
+  preferredCar: string
   onOpenLegal: (modal: 'privacy' | 'consent', opener: HTMLElement) => void
 }) {
-  const [formData, setFormData] = useState<LeadFormData>(initialLeadFormData)
+  const [formData, setFormData] = useState<LeadFormData>({ ...initialLeadFormData, car: preferredCar })
   const [errors, setErrors] = useState<LeadFormErrors>({})
   const [status, setStatus] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [submitUrl, setSubmitUrl] = useState('')
+  const [submittedChannel, setSubmittedChannel] = useState<PreferredContact>('whatsapp')
+  const submittedChannelConfig = submissionChannels[submittedChannel]
 
-  const minEndDate = formData.startDate || undefined
+  const today = useMemo(() => {
+    const now = new Date()
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+    return localDate.toISOString().slice(0, 10)
+  }, [])
+
+  useEffect(() => {
+    setFormData((current) => ({ ...current, car: preferredCar }))
+  }, [preferredCar])
 
   const validate = () => {
     const nextErrors: LeadFormErrors = {}
+    const digits = formData.phone.replace(/\D/g, '')
     if (!formData.car) nextErrors.car = 'Выберите автомобиль.'
     if (!formData.startDate) nextErrors.startDate = 'Укажите дату начала аренды.'
+    if (formData.startDate && formData.startDate < today) nextErrors.startDate = 'Дата начала уже прошла.'
     if (!formData.endDate) nextErrors.endDate = 'Укажите дату окончания аренды.'
     if (formData.startDate && formData.endDate && formData.endDate < formData.startDate) {
       nextErrors.endDate = 'Дата окончания не может быть раньше даты начала.'
     }
     if (!formData.name.trim()) nextErrors.name = 'Укажите имя.'
-    if (!formData.phone.trim()) nextErrors.phone = 'Укажите номер телефона.'
-    if (!/^[+()\-\s\d]{7,}$/.test(formData.phone.trim())) {
-      nextErrors.phone = 'Введите номер в удобном российском формате.'
-    }
-    if (!formData.consent) nextErrors.consent = 'Подтвердите согласие на обработку персональных данных.'
+    if (digits.length < 10 || digits.length > 15) nextErrors.phone = 'Введите корректный номер телефона.'
+    if (!formData.consent) nextErrors.consent = 'Подтвердите согласие на обработку данных.'
     return nextErrors
   }
 
   const updateField = <K extends keyof LeadFormData>(field: K, value: LeadFormData[K]) => {
     setFormData((current) => ({ ...current, [field]: value }))
-    setSubmitted(false)
+    setErrors((current) => ({ ...current, [field]: undefined }))
+    setStatus('')
+    setSubmitUrl('')
+  }
+
+  const updateStartDate = (value: string) => {
+    setFormData((current) => ({
+      ...current,
+      startDate: value,
+      endDate: current.endDate && current.endDate < value ? '' : current.endDate,
+    }))
+    setErrors((current) => ({ ...current, startDate: undefined, endDate: undefined }))
     setStatus('')
   }
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextErrors = validate()
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
+    if (Object.keys(nextErrors).length > 0) {
+      setStatus('Проверьте выделенные поля.')
+      return
+    }
 
-    setIsSubmitting(true)
-    try {
-      const result = await submitLead(formData)
-      setStatus(result.message)
-      setSubmitted(true)
-    } catch {
-      setStatus('Не удалось проверить форму. Попробуйте ещё раз или проверьте подключение API.')
-    } finally {
-      setIsSubmitting(false)
+    const requestedChannel = ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value
+    const channel: PreferredContact = requestedChannel === 'telegram' || requestedChannel === 'sms'
+      ? requestedChannel
+      : 'whatsapp'
+    const submissionData = { ...formData, preferredContact: channel }
+    const url = buildLeadSubmissionUrl(submissionData)
+    const message = buildLeadMessage(submissionData)
+    const channelConfig = submissionChannels[channel]
+
+    setSubmittedChannel(channel)
+    setSubmitUrl(url)
+    setStatus(channelConfig.successMessage)
+
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(message).catch(() => undefined)
+    }
+
+    if (channel === 'sms') {
+      window.location.href = url
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer')
     }
   }
 
-  const describedBy = (field: keyof LeadFormData) => (errors[field] ? `${field}-error` : undefined)
+  const describedBy = (field: keyof LeadFormData) => `${field}-error`
 
   return (
     <section id="availability" className="section availability-section">
       <div className="container form-layout">
-        <div>
-          <p className="eyebrow">Проверка доступности</p>
-          <h2>Оставьте даты и предпочтительный BMW</h2>
+        <div className="form-copy">
+          <p className="eyebrow">Проверить доступность</p>
+          <h2>Укажите автомобиль и даты</h2>
           <p>
-            Реальная отправка заявки пока не подключена. После заполнения форма покажет, что данные
-            прошли проверку и готовы к подключению API.
+            Выберите удобный способ отправки: WhatsApp, Telegram или обычное SMS. Форма подготовит
+            сообщение с автомобилем, датами и контактами — останется проверить и отправить его.
           </p>
+          <div className="form-contact-note">
+            <MessageCircle aria-hidden="true" size={20} />
+            <span>Ответим в выбранном канале и подтвердим доступность автомобиля.</span>
+          </div>
         </div>
         <form className="availability-form" onSubmit={handleSubmit} noValidate>
           <div className="field">
             <label htmlFor="car">Автомобиль *</label>
-            <select
-              id="car"
-              value={formData.car}
-              onChange={(event) => updateField('car', event.target.value)}
-              aria-invalid={Boolean(errors.car)}
-              aria-describedby={describedBy('car')}
-              required
-            >
-              {formCarOptions.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
+            <select id="car" value={formData.car} onChange={(event) => updateField('car', event.target.value)} aria-invalid={Boolean(errors.car)} aria-describedby={describedBy('car')} required>
+              {formCarOptions.map((option) => <option key={option}>{option}</option>)}
             </select>
             <FieldError id="car-error" message={errors.car} />
           </div>
           <div className="form-row">
             <div className="field">
               <label htmlFor="startDate">Дата начала *</label>
-              <input
-                id="startDate"
-                type="date"
-                value={formData.startDate}
-                onChange={(event) => updateField('startDate', event.target.value)}
-                aria-invalid={Boolean(errors.startDate)}
-                aria-describedby={describedBy('startDate')}
-                required
-              />
+              <input id="startDate" type="date" min={today} value={formData.startDate} onChange={(event) => updateStartDate(event.target.value)} aria-invalid={Boolean(errors.startDate)} aria-describedby={describedBy('startDate')} required />
               <FieldError id="startDate-error" message={errors.startDate} />
             </div>
             <div className="field">
               <label htmlFor="endDate">Дата окончания *</label>
-              <input
-                id="endDate"
-                type="date"
-                min={minEndDate}
-                value={formData.endDate}
-                onChange={(event) => updateField('endDate', event.target.value)}
-                aria-invalid={Boolean(errors.endDate)}
-                aria-describedby={describedBy('endDate')}
-                required
-              />
+              <input id="endDate" type="date" min={formData.startDate || today} value={formData.endDate} onChange={(event) => updateField('endDate', event.target.value)} aria-invalid={Boolean(errors.endDate)} aria-describedby={describedBy('endDate')} required />
               <FieldError id="endDate-error" message={errors.endDate} />
             </div>
           </div>
           <div className="form-row">
             <div className="field">
-              <label htmlFor="name">Имя *</label>
-              <input
-                id="name"
-                type="text"
-                value={formData.name}
-                onChange={(event) => updateField('name', event.target.value)}
-                autoComplete="name"
-                aria-invalid={Boolean(errors.name)}
-                aria-describedby={describedBy('name')}
-                required
-              />
+              <label htmlFor="name">Ваше имя *</label>
+              <input id="name" type="text" autoComplete="name" value={formData.name} onChange={(event) => updateField('name', event.target.value)} aria-invalid={Boolean(errors.name)} aria-describedby={describedBy('name')} placeholder="Например, Алексей" required />
               <FieldError id="name-error" message={errors.name} />
             </div>
             <div className="field">
-              <label htmlFor="phone">Номер телефона *</label>
-              <input
-                id="phone"
-                type="tel"
-                inputMode="tel"
-                placeholder="+7"
-                value={formData.phone}
-                onChange={(event) => updateField('phone', event.target.value)}
-                autoComplete="tel"
-                aria-invalid={Boolean(errors.phone)}
-                aria-describedby={describedBy('phone')}
-                required
-              />
+              <label htmlFor="phone">Телефон *</label>
+              <input id="phone" type="tel" inputMode="tel" autoComplete="tel" value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} aria-invalid={Boolean(errors.phone)} aria-describedby={describedBy('phone')} placeholder="+7 999 000-00-00" required />
               <FieldError id="phone-error" message={errors.phone} />
             </div>
           </div>
-          <fieldset className="field">
-            <legend>Предпочтительный способ связи *</legend>
-            <div className="radio-group">
-              {(['phone', 'telegram', 'whatsapp'] as const).map((method) => (
-                <label key={method}>
-                  <input
-                    type="radio"
-                    name="preferredContact"
-                    checked={formData.preferredContact === method}
-                    onChange={() => updateField('preferredContact', method)}
-                  />
-                  {method === 'phone' ? 'Телефон' : method === 'telegram' ? 'Telegram' : 'WhatsApp'}
-                </label>
-              ))}
-            </div>
-          </fieldset>
           <div className="field">
             <label htmlFor="comment">Комментарий</label>
-            <textarea
-              id="comment"
-              value={formData.comment}
-              onChange={(event) => updateField('comment', event.target.value)}
-              rows={4}
-              placeholder="Например: нужна подача к отелю или детское кресло"
-            />
+            <textarea id="comment" rows={3} value={formData.comment} onChange={(event) => updateField('comment', event.target.value)} placeholder="Место подачи, время или важные детали" />
           </div>
-          <div className="field checkbox-field">
+          <div className="checkbox-field">
             <label>
-              <input
-                type="checkbox"
-                checked={formData.consent}
-                onChange={(event) => updateField('consent', event.target.checked)}
-                aria-invalid={Boolean(errors.consent)}
-                aria-describedby={describedBy('consent')}
-                required
-              />
+              <input type="checkbox" checked={formData.consent} onChange={(event) => updateField('consent', event.target.checked)} aria-invalid={Boolean(errors.consent)} aria-describedby={describedBy('consent')} />
               <span>
-                Согласен на обработку персональных данных. Ознакомиться с{' '}
-                <button type="button" className="text-button" onClick={(event) => onOpenLegal('privacy', event.currentTarget)}>
-                  политикой конфиденциальности
-                </button>{' '}
-                и{' '}
-                <button type="button" className="text-button" onClick={(event) => onOpenLegal('consent', event.currentTarget)}>
-                  согласием
-                </button>
-                .
+                Я согласен на обработку данных и ознакомился с{' '}
+                <button type="button" className="text-button" onClick={(event) => onOpenLegal('consent', event.currentTarget)}>условиями</button>.
               </span>
             </label>
             <FieldError id="consent-error" message={errors.consent} />
           </div>
-          <button className="button button-primary form-submit" type="submit" disabled={isSubmitting || submitted}>
-            <CalendarCheck aria-hidden="true" size={18} />
-            {isSubmitting ? 'Проверяем...' : submitted ? 'Проверено' : 'Проверить доступность'}
-          </button>
+          <div className="form-action-grid">
+            <button className="button button-primary" type="submit" value="whatsapp">
+              <MessageCircle aria-hidden="true" size={19} />
+              WhatsApp
+            </button>
+            <button className="button button-secondary" type="submit" value="telegram">
+              <Send aria-hidden="true" size={19} />
+              Telegram
+            </button>
+            <button className="button button-secondary" type="submit" value="sms">
+              <MessageSquareText aria-hidden="true" size={19} />
+              SMS
+            </button>
+            <a className="button button-secondary" href={contactConfig.phoneHref}>
+              <Phone aria-hidden="true" size={19} />
+              Позвонить
+            </a>
+          </div>
           {status ? (
-            <p className={`form-status ${submitted ? 'is-success' : 'is-error'}`} role="status" aria-live="polite">
-              {status}
+            <p className={`form-status ${submitUrl ? 'is-success' : 'is-error'}`} role="status">
+              <span>{status}</span>
+              {submitUrl ? (
+                <a
+                  href={submitUrl}
+                  target={submittedChannel === 'sms' ? undefined : '_blank'}
+                  rel={submittedChannel === 'sms' ? undefined : 'noreferrer'}
+                >
+                  Открыть {submittedChannelConfig.label} ещё раз
+                </a>
+              ) : null}
             </p>
           ) : null}
         </form>
@@ -685,79 +681,61 @@ function AvailabilityForm({
 }
 
 function FieldError({ id, message }: { id: string; message?: string }) {
-  return message ? (
-    <p className="field-error" id={id}>
-      {message}
+  return (
+    <p className={`field-error ${message ? 'is-visible' : ''}`} id={id} aria-live="polite">
+      {message || '\u00a0'}
     </p>
-  ) : null
+  )
 }
 
 function FAQ() {
-  const [openItems, setOpenItems] = useState<Set<number>>(new Set([0]))
-
-  const toggle = (index: number) => {
-    setOpenItems((current) => {
-      const next = new Set(current)
-      if (next.has(index)) next.delete(index)
-      else next.add(index)
-      return next
-    })
-  }
+  const [openIndex, setOpenIndex] = useState<number | null>(0)
 
   return (
     <section id="faq" className="section">
       <div className="container section-heading">
-        <p className="eyebrow">FAQ</p>
+        <p className="eyebrow">Коротко о важном</p>
         <h2>Частые вопросы</h2>
       </div>
       <div className="container faq-list">
-        {faqItems.map(([question, answer], index) => {
-          const isOpen = openItems.has(index)
-          return (
-            <article className="faq-item" key={question}>
-              <h3>
-                <button
-                  type="button"
-                  aria-expanded={isOpen}
-                  aria-controls={`faq-panel-${index}`}
-                  onClick={() => toggle(index)}
-                >
-                  {question}
-                  <ChevronDown aria-hidden="true" />
-                </button>
-              </h3>
-              <div id={`faq-panel-${index}`} hidden={!isOpen}>
-                <p>{answer}</p>
-              </div>
-            </article>
-          )
-        })}
+        {faqItems.map(([question, answer], index) => (
+          <article className="faq-item" key={question}>
+            <h3>
+              <button type="button" aria-expanded={openIndex === index} aria-controls={`faq-${index}`} onClick={() => setOpenIndex(openIndex === index ? null : index)}>
+                <span>{question}</span>
+                <ChevronDown aria-hidden="true" />
+              </button>
+            </h3>
+            <div id={`faq-${index}`} hidden={openIndex !== index}><p>{answer}</p></div>
+          </article>
+        ))}
       </div>
     </section>
   )
 }
 
 function Contacts() {
-  const hasContact = contactConfig.phone || contactConfig.telegramUrl || contactConfig.whatsappUrl || contactConfig.email
-
   return (
     <section id="contacts" className="section contact-section">
       <div className="container contact-layout">
         <div>
           <p className="eyebrow">Контакты</p>
-          <h2>Краснодар. Напишите нам или оставьте номер телефона — проверим даты и расскажем об условиях аренды.</h2>
+          <h2>Свяжитесь удобным способом</h2>
+          <p>Напишите модель и даты — менеджер проверит доступность и расскажет об условиях.</p>
         </div>
         <div className="contact-actions">
-          {contactConfig.phone ? <a className="button button-primary" href={`tel:${contactConfig.phone}`}>Позвонить</a> : null}
-          {contactConfig.telegramUrl ? <a className="button button-secondary" href={contactConfig.telegramUrl}>Telegram</a> : null}
-          {contactConfig.whatsappUrl ? <a className="button button-secondary" href={contactConfig.whatsappUrl}>WhatsApp</a> : null}
-          {contactConfig.email ? <a className="button button-secondary" href={`mailto:${contactConfig.email}`}>Email</a> : null}
-          {!hasContact ? (
-            <a className="button button-primary" href="#availability">
-              <CalendarCheck aria-hidden="true" size={18} />
-              Оставить номер
-            </a>
-          ) : null}
+          <a className="button button-primary" href={contactConfig.whatsappUrl} target="_blank" rel="noreferrer">
+            <MessageCircle aria-hidden="true" size={19} />
+            WhatsApp
+          </a>
+          <a className="button button-secondary" href={contactConfig.telegramUrl} target="_blank" rel="noreferrer">
+            <Send aria-hidden="true" size={19} />
+            {contactConfig.telegramLabel}
+          </a>
+          <a className="button button-secondary" href={contactConfig.phoneHref}>
+            <Phone aria-hidden="true" size={19} />
+            {contactConfig.phone}
+          </a>
         </div>
       </div>
     </section>
@@ -768,48 +746,35 @@ function FinalCTA() {
   return (
     <section className="section final-cta">
       <div className="container">
-        <h2>Узнайте за несколько минут, свободен ли выбранный BMW на ваши даты</h2>
-        <p>Краснодар. Работаем быстро и без лишней бюрократии.</p>
+        <p className="eyebrow">Готовы выбрать?</p>
+        <h2>Проверьте свободные даты за пару минут</h2>
+        <p>Выберите автомобиль, заполните короткую форму и отправьте готовую заявку менеджеру.</p>
         <a className="button button-primary" href="#availability">
-          <CalendarCheck aria-hidden="true" size={18} />
-          Проверить свободные даты
+          <CalendarCheck aria-hidden="true" size={19} />
+          Проверить даты
         </a>
       </div>
     </section>
   )
 }
 
-function Footer({
-  onOpenLegal,
-}: {
-  onOpenLegal: (modal: 'privacy' | 'consent', opener: HTMLElement) => void
-}) {
-  const currentYear = new Date().getFullYear()
+function Footer({ onOpenLegal }: { onOpenLegal: (modal: 'privacy' | 'consent', opener: HTMLElement) => void }) {
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
         <div>
-          <a className="logo footer-logo" href="#top">
-            <span>Аренда автомобилей</span>
-            <strong>Краснодар</strong>
-          </a>
-          <p>Прокат премиальных BMW с подачей по Краснодару, к отелю или в аэропорт.</p>
+          <a className="logo footer-logo" href="#top"><span>Аренда автомобилей</span><strong>Краснодар</strong></a>
+          <p>BMW премиум-класса с подачей по Краснодару.</p>
         </div>
-        <nav aria-label="Ссылки в подвале">
-          {navItems.map((item) => (
-            <a key={item.href} href={item.href}>
-              {item.label}
-            </a>
-          ))}
+        <nav aria-label="Навигация в подвале">
+          {navItems.map((item) => <a key={item.href} href={item.href}>{item.label}</a>)}
         </nav>
         <div className="footer-legal">
-          <button type="button" onClick={(event) => onOpenLegal('privacy', event.currentTarget)}>
-            Политика конфиденциальности
-          </button>
-          <button type="button" onClick={(event) => onOpenLegal('consent', event.currentTarget)}>
-            Согласие на обработку персональных данных
-          </button>
-          <span>{currentYear}</span>
+          <a href={contactConfig.phoneHref}><Phone aria-hidden="true" size={17} />{contactConfig.phone}</a>
+          <a href={contactConfig.telegramUrl} target="_blank" rel="noreferrer"><Send aria-hidden="true" size={17} />Telegram</a>
+          <button type="button" onClick={(event) => onOpenLegal('privacy', event.currentTarget)}>Политика конфиденциальности</button>
+          <button type="button" onClick={(event) => onOpenLegal('consent', event.currentTarget)}>Согласие на обработку данных</button>
+          <span>© {new Date().getFullYear()} Аренда автомобилей Краснодар</span>
         </div>
       </div>
     </footer>
@@ -818,15 +783,9 @@ function Footer({
 
 function BottomActions() {
   return (
-    <nav className="bottom-actions" aria-label="Быстрые действия">
-      <a href="#availability">
-        <MessageCircle aria-hidden="true" size={18} />
-        Оставить номер
-      </a>
-      <a href="#availability">
-        <CalendarCheck aria-hidden="true" size={18} />
-        Проверить даты
-      </a>
+    <nav className="bottom-actions" aria-label="Быстрые контакты">
+      <a href={contactConfig.whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle aria-hidden="true" size={19} /><span>WhatsApp</span></a>
+      <a href={contactConfig.telegramUrl} target="_blank" rel="noreferrer"><Send aria-hidden="true" size={19} /><span>Telegram</span></a>
     </nav>
   )
 }
@@ -835,120 +794,31 @@ function BackToTopButton() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 520)
+    const onScroll = () => setVisible(window.scrollY > 700)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const scrollToTop = () => {
-    document.querySelector('#top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   return (
-    <button
-      className={`back-to-top ${visible ? 'is-visible' : ''}`}
-      type="button"
-      aria-label="Вернуться в начало страницы"
-      onClick={scrollToTop}
-    >
+    <button type="button" className={`back-to-top ${visible ? 'is-visible' : ''}`} aria-label="Вернуться наверх" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
       <CircleArrowUp aria-hidden="true" />
     </button>
   )
 }
 
-function ImageLightbox({
-  image,
-  onClose,
-  onPrev,
-  onNext,
-}: {
-  image: (typeof x6Gallery)[number]
-  onClose: () => void
-  onPrev: () => void
-  onNext: () => void
-}) {
-  const closeRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    closeRef.current?.focus()
-  }, [])
-
-  const stopPropagation = (event: React.MouseEvent) => event.stopPropagation()
-
-  return (
-    <div className="modal-backdrop lightbox" role="presentation" onMouseDown={onClose}>
-      <div
-        className="lightbox-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Просмотр фотографии BMW X6"
-        onMouseDown={stopPropagation}
-      >
-        <button ref={closeRef} className="icon-button modal-close" type="button" onClick={onClose} aria-label="Закрыть фото">
-          <X aria-hidden="true" />
-        </button>
-        <img src={assetUrl(image.src)} width={image.width} height={image.height} alt={image.alt} />
-        <div className="lightbox-controls">
-          <button className="button button-secondary" type="button" onClick={onPrev}>
-            Предыдущее
-          </button>
-          <button className="button button-secondary" type="button" onClick={onNext}>
-            Следующее
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function LegalModal({
-  title,
-  children,
-  onClose,
-}: {
-  title: string
-  children: React.ReactNode
-  onClose: () => void
-}) {
-  const closeRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    closeRef.current?.focus()
-  }, [])
-
+function LegalModal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Tab') {
-      const focusable = event.currentTarget.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
-      if (!focusable.length) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
+    if (event.key === 'Escape') onClose()
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <div
-        className="legal-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="legal-title"
-        onMouseDown={(event) => event.stopPropagation()}
-        onKeyDown={onKeyDown}
-      >
-        <button ref={closeRef} className="icon-button modal-close" type="button" onClick={onClose} aria-label="Закрыть окно">
-          <X aria-hidden="true" />
-        </button>
-        <h2 id="legal-title">{title}</h2>
+    <div className="modal-backdrop" role="presentation" onKeyDown={onKeyDown} onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="legal-panel" role="dialog" aria-modal="true" aria-label={title}>
+        <button type="button" className="icon-button modal-close" aria-label="Закрыть окно" onClick={onClose}><X aria-hidden="true" /></button>
+        <h2>{title}</h2>
         {children}
-      </div>
+      </section>
     </div>
   )
 }
