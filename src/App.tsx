@@ -23,6 +23,8 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type SetStateAction,
+  type TouchEvent,
+  type WheelEvent,
   useEffect,
   useMemo,
   useRef,
@@ -317,6 +319,11 @@ function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => voi
   const [infoOpen, setInfoOpen] = useState(false)
   const titleId = `${car.id}-modal-title`
   const infoRef = useRef<HTMLDivElement>(null)
+  const swipeStartX = useRef<number | null>(null)
+  const wheelLocked = useRef(false)
+
+  const showPreviousPhoto = () => setActivePhoto((current) => (current + car.gallery.length - 1) % car.gallery.length)
+  const showNextPhoto = () => setActivePhoto((current) => (current + 1) % car.gallery.length)
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -332,6 +339,33 @@ function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => voi
     infoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    swipeStartX.current = event.changedTouches[0]?.clientX ?? null
+  }
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (swipeStartX.current === null) return
+    const distance = (event.changedTouches[0]?.clientX ?? swipeStartX.current) - swipeStartX.current
+    swipeStartX.current = null
+    if (Math.abs(distance) < 42) return
+    if (distance < 0) showNextPhoto()
+    else showPreviousPhoto()
+  }
+
+  const handleGalleryWheel = (event: WheelEvent<HTMLDivElement>) => {
+    const distance = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.shiftKey
+        ? event.deltaY
+        : 0
+    if (Math.abs(distance) < 12 || wheelLocked.current) return
+    event.preventDefault()
+    wheelLocked.current = true
+    if (distance > 0) showNextPhoto()
+    else showPreviousPhoto()
+    window.setTimeout(() => { wheelLocked.current = false }, 260)
+  }
+
   return (
     <div className="modal-backdrop car-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="car-modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
@@ -340,7 +374,13 @@ function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => voi
         </button>
         <div className="car-modal-grid">
           <div className="car-gallery">
-            <div className="car-main-photo">
+            <div
+              className="car-main-photo"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={() => { swipeStartX.current = null }}
+              onWheel={handleGalleryWheel}
+            >
               <img
                 src={assetUrl(car.gallery[activePhoto].src)}
                 width={car.gallery[activePhoto].width}
@@ -353,7 +393,7 @@ function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => voi
                     type="button"
                     className="gallery-arrow gallery-prev"
                     aria-label="Предыдущее фото"
-                    onClick={() => setActivePhoto((activePhoto + car.gallery.length - 1) % car.gallery.length)}
+                    onClick={showPreviousPhoto}
                   >
                     <ChevronLeft aria-hidden="true" />
                   </button>
@@ -361,7 +401,7 @@ function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => voi
                     type="button"
                     className="gallery-arrow gallery-next"
                     aria-label="Следующее фото"
-                    onClick={() => setActivePhoto((activePhoto + 1) % car.gallery.length)}
+                    onClick={showNextPhoto}
                   >
                     <ChevronRight aria-hidden="true" />
                   </button>
@@ -731,6 +771,10 @@ function Contacts() {
           <a className="button button-secondary" href={contactConfig.telegramUrl} target="_blank" rel="noreferrer">
             <Send aria-hidden="true" size={19} />
             {contactConfig.telegramLabel}
+          </a>
+          <a className="button button-secondary" href={contactConfig.telegramGroupUrl} target="_blank" rel="noreferrer">
+            <Send aria-hidden="true" size={19} />
+            {contactConfig.telegramGroupLabel}
           </a>
           <a className="button button-secondary" href={contactConfig.phoneHref}>
             <Phone aria-hidden="true" size={19} />
