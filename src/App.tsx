@@ -229,7 +229,7 @@ function Hero() {
         <div className="hero-copy">
           <p className="eyebrow">Премиальные дизельные BMW в Краснодаре</p>
           <h1>
-            Аренда премиальных
+            Аренда премиальных{' '}
             <span>дизельных автомобилей</span>
           </h1>
           <p className="hero-text">
