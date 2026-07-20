@@ -33,7 +33,7 @@ import {
 import './App.css'
 import { contactConfig } from './config/contactConfig'
 import {
-  benefits,
+  benefitGroups,
   cars,
   faqItems,
   heroBenefits,
@@ -227,11 +227,14 @@ function Hero() {
     <section id="top" className="hero-section section">
       <div className="container hero-grid">
         <div className="hero-copy">
-          <p className="eyebrow">Премиальная аренда BMW в Краснодаре</p>
-          <h1>Аренда премиальных автомобилей в Краснодаре</h1>
+          <p className="eyebrow">Премиальные дизельные BMW в Краснодаре</p>
+          <h1>
+            Аренда премиальных
+            <span>дизельных автомобилей</span>
+          </h1>
           <p className="hero-text">
-            Выберите одну из четырёх актуальных моделей, посмотрите все фотографии и отправьте даты
-            менеджеру прямо из формы.
+            Четыре дизельных BMW для города, деловых встреч и путешествий. Выберите автомобиль,
+            посмотрите фотографии и отправьте даты менеджеру прямо из формы.
           </p>
           <ul className="hero-benefits" aria-label="Ключевые преимущества">
             {heroBenefits.map((item) => (
@@ -450,7 +453,6 @@ function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => voi
             <ChevronDown aria-hidden="true" />
           </button>
           <div id={`${car.id}-info`} className="car-info-content" hidden={!infoOpen}>
-            <p className="car-info-lead">{car.intro}</p>
             <div className="car-info-blocks">
               {car.info.map((item) => (
                 <article key={item.title}>
@@ -471,20 +473,7 @@ function CarModal({ car, onClose, onChoose }: { car: CarItem; onClose: () => voi
 }
 
 function Benefits() {
-  const icons = [
-    MapPin,
-    MapPin,
-    Clock3,
-    ShieldCheck,
-    CalendarDays,
-    Sparkles,
-    CarFront,
-    MapPin,
-    Check,
-    Send,
-    Clock3,
-    Sparkles,
-  ]
+  const icons = [MapPin, CalendarDays, Sparkles, ShieldCheck]
 
   return (
     <section id="benefits" className="section benefits-section">
@@ -493,12 +482,22 @@ function Benefits() {
         <h2>Всё необходимое для спокойной аренды</h2>
       </div>
       <div className="container benefits-grid">
-        {benefits.map((item, index) => {
+        {benefitGroups.map((group, index) => {
           const Icon = icons[index]
           return (
-            <article key={item} className="benefit-card">
-              <span className="feature-icon"><Icon aria-hidden="true" size={21} /></span>
-              <p>{item}</p>
+            <article key={group.title} className="benefit-card">
+              <div className="benefit-card-heading">
+                <span className="feature-icon"><Icon aria-hidden="true" size={21} /></span>
+                <h3>{group.title}</h3>
+              </div>
+              <ul>
+                {group.items.map((item) => (
+                  <li key={item}>
+                    <Check aria-hidden="true" size={17} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </article>
           )
         })}
